@@ -90,57 +90,59 @@ plt.axis("off")
 plt.show()
 
 PRACTICAL 2 TRANSFER LEARNING
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
 import numpy as np
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
-from tensorflow.keras.datasets import cifar10
-from skimage.color import rgb2gray
-from skimage.transform import resize
+
+(x_train, y_train), (x_test,y_test)= keras.datasets.cifar10.load_data()
+
+cat_dog_idx_train = np.where((y_train ==3) | (y_train ==5))[0]
+cat_dog_idx_test = np.where((y_test ==3) | (y_test ==5))[0]
+
+x_train = x_train[cat_dog_idx_train]
+y_train = (y_train[cat_dog_idx_train]== 5).astype(int) # dog=1, cat= 0
+
+x_test = x_test[cat_dog_idx_test]
+y_test = (y_test[cat_dog_idx_test]==5).astype(int) # dog=1, cat= 0
+
+# Resize to 224x224 for MobileNetV2
+x_train = tf.image.resize(x_train,(224,224)) / 255.0
+x_test = tf.image.resize(x_test,(224, 224)) / 255.0
+
+base = keras.applications.MobileNetV2(
+    include_top=False, input_shape=(224,224,3), weights="imagenet")
+base.trainable = False
+
+model = keras.Sequential([
+    base,
+    layers.GlobalAveragePooling2D(),
+    layers.Dense(1, activation="sigmoid")   # Binary: cat & dog
+])
+
+model.compile(optimizer="adam",
+             loss="binary_crossentropy",
+             metrics=["accuracy"])
+
 from PIL import Image
+import numpy as np
 
-# 1️⃣ Load CIFAR-10 dataset
-(x_train, y_train), (x_test, y_test) = cifar10.load_data()
-
-# 2️⃣ Keep only Cats(3) and Dogs(5)
-def filter_classes(X, y):
-    idx = np.where((y == 3) | (y == 5))[0]
-    X = X[idx]
-    y = (y[idx] == 5).astype(int).ravel()   # dog=1, cat=0
-    return X, y
-
-X_train_cd, y_train_cd = filter_classes(x_train, y_train)
-X_test_cd, y_test_cd = filter_classes(x_test, y_test)
-
-# 3️⃣ Convert images → grayscale → flatten
-def preprocess_images(X):
-    processed = []
-    for img in X:
-        gray = rgb2gray(img)
-        processed.append(gray.flatten())
-    return np.array(processed)
-
-X_train_p = preprocess_images(X_train_cd)
-X_test_p = preprocess_images(X_test_cd)
-
-# 4️⃣ Train model
-model = RandomForestClassifier(n_estimators=200, random_state=42)
-model.fit(X_train_p, y_train_cd)
-
-# 5️⃣ Evaluate model
-pred = model.predict(X_test_p)
-print("Accuracy:", accuracy_score(y_test_cd, pred))
-
-# 6️⃣ Predict custom image
-img_path = "Cat.png"
+#-------Load NEW image-
+img_path = r"C:\Users\User35\Downloads\download (1).jfif"
 
 img = Image.open(img_path).convert("RGB")
-img = resize(np.array(img), (32,32))  # resize to CIFAR size
-gray = rgb2gray(img).flatten()
+img = img.resize((224,224))
 
-prediction = model.predict([gray])[0]
+x = np.array(img)/ 255.0
+x = np.expand_dims(x,0)     # shape(1, 224, 224,3)
 
-print("Prediction:", "DOG" if prediction == 1 else "CAT")
+# ------- Predict------
+prob = model.predict(x)[0][0]
+
+if prob > 0.5:
+    print("Prediction: DOG Confidence:", prob)
+else:
+    print("Prediction: CAT Confidence:", 1-prob)
 
 PRACTICAL 3 FEW SHOT LEARNING
 from sklearn.datasets import load_breast_cancer
